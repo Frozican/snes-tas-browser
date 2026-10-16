@@ -12,7 +12,7 @@ docker run --rm \
     git clone https://github.com/wasm-gaming/snes9x-wasm.git /tmp/snes9x-wasm-port
     cd /tmp/snes9x-wasm-port
     git checkout --detach bd2ed679b6b2422a83667b45efd75737c2758639
-    python3 - <<'"'"'PY'"'"'
+    python3 - <<PY
 from pathlib import Path
 p = Path("scripts/shim/s9x_shim.cpp")
 s = p.read_text()
