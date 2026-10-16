@@ -65,6 +65,7 @@ type Snes9xModule = {
   _s9xwasm_state_load(ptr: number, size: number): number;
   _s9xwasm_sram_ptr(): number;
   _s9xwasm_sram_size(): number;
+  _s9xwasm_read_wram?(offset: number): number;
   _s9xwasm_rom_name(): number;
   _s9xwasm_rom_size(): number;
   // Live `Settings` writes, added to the shim after the first release. They
@@ -249,6 +250,8 @@ export type Snes9xInstance = EngineInstance & {
   audioCaptureStream(): MediaStream;
   /** Apply deterministic TAS inputs to controller 1. */
   setTasInput(buttons: string[]): void;
+  /** Read one byte from SNES WRAM (banks 7E:0000-7F:FFFF). */
+  readWram(offset: number): number | null;
   /** Live handle on the emulator settings; writes apply to the running game. */
   config: Snes9xConfig;
   /** The in-game settings overlay, or `null` when `options.escMenu` is false. */
@@ -794,6 +797,11 @@ export async function load(config: EngineConfig): Promise<Snes9xInstance> {
       else mod._s9xwasm_reset();
     },
     setInput,
+    readWram(offset: number) {
+      const read = mod._s9xwasm_read_wram;
+      if (typeof read !== 'function' || !Number.isInteger(offset) || offset < 0 || offset > 0x1ffff) return null;
+      return read(offset) & 0xff;
+    },
     setTasInput(buttons: string[]) {
       const bitNames: Record<string, number> = { B: 0, Y: 1, Select: 2, Start: 3, Up: 4, Down: 5, Left: 6, Right: 7, A: 8, X: 9, L: 10, R: 11 };
       let mask = 0;
