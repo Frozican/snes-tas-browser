@@ -8,7 +8,7 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: pages-main-recovery
   cancel-in-progress: true
 jobs:
   build:
