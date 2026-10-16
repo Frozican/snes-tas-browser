@@ -74,7 +74,7 @@ $('#video-record').onclick=async()=>{
    $('#video-record').disabled=false;$('#video-stop').disabled=true;
    videoStream?.getTracks().forEach(t=>t.stop());videoStream=null;
   };
-  mediaRecorder.start(250);
+  mediaRecorder.start();
   $('#video-record').disabled=true;$('#video-stop').disabled=false;
   $('#video-status').textContent='Recording video + emulator audio…';
   if(engine?.resumeAudioForCapture)await engine.resumeAudioForCapture();
