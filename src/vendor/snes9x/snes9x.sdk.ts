@@ -243,6 +243,10 @@ function heapAlloc(mod: Snes9xModule, bytes: Uint8Array): number {
 export type Snes9xInstance = EngineInstance & {
   /** Run exactly one emulated frame while paused. */
   stepFrame(): void;
+  /** Resume the audio clock without starting the emulator's normal render loop. */
+  resumeAudioForCapture(): Promise<void>;
+  /** MediaStream carrying the emulator's generated stereo audio. */
+  audioCaptureStream(): MediaStream;
   /** Apply deterministic TAS inputs to controller 1. */
   setTasInput(buttons: string[]): void;
   /** Live handle on the emulator settings; writes apply to the running game. */
@@ -313,8 +317,11 @@ export async function load(config: EngineConfig): Promise<Snes9xInstance> {
     outputChannelCount: [2],
   });
   const gain = audioCtx.createGain();
+  const audioCaptureDestination = audioCtx.createMediaStreamDestination();
   gain.gain.value = Math.max(0, Math.min(1, opts.volume));
-  sink.connect(gain).connect(audioCtx.destination);
+  sink.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.connect(audioCaptureDestination);
 
   let enqueuedFrames = 0;
   let consumedFrames = 0;
@@ -790,6 +797,12 @@ export async function load(config: EngineConfig): Promise<Snes9xInstance> {
       }
       tasMasks[0] = mask;
       pushInputs();
+    },
+    async resumeAudioForCapture() {
+      await audioCtx.resume();
+    },
+    audioCaptureStream() {
+      return audioCaptureDestination.stream;
     },
     stepFrame() {
       if (!running) throw new Error('snes9x: start the emulator before stepping');
