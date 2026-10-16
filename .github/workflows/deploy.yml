@@ -19,6 +19,11 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - name: Stage Snes9x WebAssembly runtime
+        run: |
+          mkdir -p public/core
+          cp node_modules/@wasm-gaming/snes9x-wasm/dist/snes9x/snes9x.js public/core/snes9x.js
+          cp node_modules/@wasm-gaming/snes9x-wasm/dist/snes9x/snes9x.wasm public/core/snes9x.wasm
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
