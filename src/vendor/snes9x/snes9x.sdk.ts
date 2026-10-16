@@ -783,6 +783,12 @@ export async function load(config: EngineConfig): Promise<Snes9xInstance> {
       void audioCtx.resume();
       startLoop();
     },
+    async clearSram() {
+      if (!sramSize) return;
+      const ptr = mod._s9xwasm_sram_ptr();
+      mod.HEAPU8.fill(0, ptr, ptr + sramSize);
+      await persistSram();
+    },
     reset() {
       if (opts.region !== mappedRegion) remapCartridge();
       else mod._s9xwasm_reset();
