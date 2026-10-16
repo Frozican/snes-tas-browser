@@ -87,8 +87,15 @@ $('#save-state').onclick=async()=>{if(!engine){alert('Bitte zuerst eine ROM lade
 $('#load-state').onclick=async()=>{if(!engine||!checkpoint)return;try{engine.pause();playing=false;await engine.loadState(checkpoint);$('#play').textContent='▶ Play TAS';$('#status').textContent='STATE RESTORED · FRAME '+frame}catch(err){alert('Load State fehlgeschlagen: '+(err?.message||err))}};
 $('#reset-rom').onclick=async()=>{
  if(!engine){alert('Bitte zuerst eine ROM laden.');return}
- stopTas();engine.reset();frame=0;length=Math.max(length,1);frameStates.clear();checkpoint=null;$('#load-state').disabled=true;
- try{frameStates.set(0,await engine.saveState());$('#status').textContent='ROM RESET · FRAME 0'}catch(err){$('#status').textContent='RESET · NO CHECKPOINT';console.error(err)}
+ stopTas();
+ try{
+  await engine.clearSram();
+  engine.reset();
+  movie.clear();frame=0;length=600;frameStates.clear();checkpoint=null;$('#load-state').disabled=true;
+  $('#movie-length').value=String(length);
+  frameStates.set(0,await engine.saveState());
+  $('#status').textContent='FULL RESET · SRAM + TAS CLEARED';
+ }catch(err){$('#status').textContent='RESET ERROR';console.error(err);alert('Reset fehlgeschlagen: '+(err&&err.message||err))}
  draw()
 };
 function editInputRange(clearOnly){const start=Math.max(0,Math.min(1000000,Math.floor(Number($('#range-start').value)||0)));const end=Math.max(0,Math.min(1000000,Math.floor(Number($('#range-end').value)||0)));const key=$('#range-key').value;if(end<start){$('#status').textContent='RANGE ERROR · END BEFORE START';return}for(let i=start;i<=end;i++){const set=new Set(movie.get(i)||[]);if(clearOnly)set.delete(key);else set.add(key);if(set.size)movie.set(i,set);else movie.delete(i)}if(!clearOnly)length=Math.max(length,end+1);$('#status').textContent=(clearOnly?'CLEARED ':'HOLD '+key+' · ')+start+'–'+end;draw()}$('#apply-range').onclick=()=>editInputRange(false);$('#clear-range').onclick=()=>editInputRange(true);$('#movie-length').onchange=e=>{const value=Number(e.target.value);if(!Number.isFinite(value)){e.target.value=length;return}length=Math.max(1,Math.min(1000000,Math.floor(value)));e.target.value=length;draw();$('#status').textContent='MOVIE LENGTH · '+length+' FRAMES'};$('#minus10').onclick=()=>step(-10);$('#minus').onclick=()=>step(-1);$('#plus').onclick=()=>step(1);$('#plus10').onclick=()=>step(10);$('#jump').onchange=e=>{frame=Math.max(0,+e.target.value||0);step(0)};$('#clear').onclick=()=>{movie.delete(frame);draw()};document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>setInput(b.dataset.key));$('#play').onclick=playTas;
