@@ -60,8 +60,9 @@ $('#video-record').onclick=()=>{
  if(!canvas.captureStream||!window.MediaRecorder){alert('Videoaufnahme wird von diesem Browser nicht unterstützt.');return}
  if(frame>=length)frame=0;
  try{
-  videoStream=canvas.captureStream(0);mediaChunks=[];
-  const types=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm'];
+  videoStream=canvas.captureStream(30);mediaChunks=[];
+  if(engine?.audioCaptureStream){for(const track of engine.audioCaptureStream().getAudioTracks())videoStream.addTrack(track)}
+  const types=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'];
   const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||'';
   mediaRecorder=new MediaRecorder(videoStream,mime?{mimeType:mime}:undefined);
   mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)mediaChunks.push(e.data)};
@@ -75,12 +76,13 @@ $('#video-record').onclick=()=>{
   };
   mediaRecorder.start(250);
   $('#video-record').disabled=true;$('#video-stop').disabled=false;
-  $('#video-status').textContent='Recording TAS playback…';
+  $('#video-status').textContent='Recording video + emulator audio…';
+  if(engine?.resumeAudioForCapture)await engine.resumeAudioForCapture();
   if(!playing)playTas();
  }catch(err){alert('Videoaufnahme fehlgeschlagen: '+(err?.message||err))}
 };
 $('#video-stop').onclick=()=>{stopTas();stopVideoCapture()};
-function playTas(){if(!engine){alert('Bitte zuerst eine gültige SNES-ROM laden.');return}if(playing){stopTas();$('#status').textContent='EMULATOR PAUSED';return}playing=true;$('#play').textContent='Ⅱ Pause';$('#status').textContent='TAS PLAYBACK';engine.pause();playTimer=setInterval(()=>{if(!engine||!playing){stopTas();return}if(frame>=length){stopTas();$('#status').textContent='MOVIE END';if(mediaRecorder&&mediaRecorder.state!=='inactive')stopVideoCapture();return}try{const buttons=recordingInputs?[...pressedKeys]:[...(movie.get(frame)||new Set())];engine.setTasInput(buttons);engine.stepFrame();const track=videoStream?.getVideoTracks?.()[0];if(track&&typeof track.requestFrame==='function')track.requestFrame();if(recordingInputs){if(buttons.length)movie.set(frame,new Set(buttons));else movie.delete(frame);length=Math.max(length,frame+1)}frame++;draw()}catch(err){stopTas();$('#status').textContent='TAS ERROR';console.error(err)}},16);}
+function playTas(){if(!engine){alert('Bitte zuerst eine gültige SNES-ROM laden.');return}if(playing){stopTas();$('#status').textContent='EMULATOR PAUSED';return}playing=true;$('#play').textContent='Ⅱ Pause';$('#status').textContent='TAS PLAYBACK';if(mediaRecorder&&mediaRecorder.state==='recording'){void engine.resumeAudioForCapture()}else engine.pause();playTimer=setInterval(()=>{if(!engine||!playing){stopTas();return}if(frame>=length){stopTas();$('#status').textContent='MOVIE END';if(mediaRecorder&&mediaRecorder.state!=='inactive')stopVideoCapture();return}try{const buttons=recordingInputs?[...pressedKeys]:[...(movie.get(frame)||new Set())];engine.setTasInput(buttons);engine.stepFrame();const track=videoStream?.getVideoTracks?.()[0];if(track&&typeof track.requestFrame==='function')track.requestFrame();if(recordingInputs){if(buttons.length)movie.set(frame,new Set(buttons));else movie.delete(frame);length=Math.max(length,frame+1)}frame++;draw()}catch(err){stopTas();$('#status').textContent='TAS ERROR';console.error(err)}},16);}
 $('#save-state').onclick=async()=>{if(!engine){alert('Bitte zuerst eine ROM laden.');return}try{checkpoint=await engine.saveState();frameStates.set(frame,checkpoint);$('#load-state').disabled=false;$('#status').textContent='STATE SAVED · FRAME '+frame}catch(err){alert('Save State fehlgeschlagen: '+(err?.message||err))}};
 $('#load-state').onclick=async()=>{if(!engine||!checkpoint)return;try{engine.pause();playing=false;await engine.loadState(checkpoint);$('#play').textContent='▶ Play TAS';$('#status').textContent='STATE RESTORED · FRAME '+frame}catch(err){alert('Load State fehlgeschlagen: '+(err?.message||err))}};
 $('#reset-rom').onclick=async()=>{
