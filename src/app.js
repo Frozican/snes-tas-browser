@@ -136,18 +136,18 @@ async function readBk2InputLog(file){
  return new TextDecoder().decode(data);
 }
 function parseBk2InputLog(log){
- const lines=log.replace(/^\\uFEFF/,'').split(/\\r?\\n/);
+ const lines=log.replace(/^\uFEFF/,'').split(/\r?\n/);
  const headerLine=lines.findIndex(line=>/^LogKey:/i.test(line.trim()));
  if(headerLine<0)throw Error('BizHawk-LogKey-Header nicht erkannt');
  const columns=lines[headerLine].trim().slice(lines[headerLine].indexOf(':')+1).split('|').map(x=>x.trim()).filter(Boolean);
  const aliases={'p1 up':'Up','p1 down':'Down','p1 left':'Left','p1 right':'Right','p1 a':'A','p1 b':'B','p1 x':'X','p1 y':'Y','p1 l':'L','p1 r':'R','p1 start':'Start','p1 select':'Select'};
  const map=[];
- columns.forEach((name,index)=>{const key=aliases[name.toLowerCase()];if(key)map.push({index:index-2,key,expected:name.split(/\\s+/).pop().toUpperCase()})});
+ columns.forEach((name,index)=>{const key=aliases[name.toLowerCase()];if(key)map.push({index:index-2,key,expected:name.split(/\s+/).pop().toUpperCase()})});
  if(!map.length)throw Error('Keine unterstützten P1-SNES-Tasten im BK2-Log gefunden');
  const inputs=[];let frame=0;
  for(const line of lines.slice(headerLine+1)){
   if(!line.startsWith('|'))continue;
-  const cells=line.replace(/^\\|/,'').replace(/\\|$/,'').split('|');
+  const cells=line.replace(/^\|/,'').replace(/\|$/,'').split('|');
   if(cells.length<2)continue;
   const buttonsField=cells[cells.length-1]||'';
   const buttons=[];
