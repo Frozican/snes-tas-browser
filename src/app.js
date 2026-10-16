@@ -54,7 +54,7 @@ $('#record-input').onclick=()=>{recordingInputs=!recordingInputs;$('#record-inpu
 function stopVideoCapture(){
  if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();
 }
-$('#video-record').onclick=()=>{
+$('#video-record').onclick=async()=>{
  const canvas=$('#game-canvas');
  if(!canvas){alert('Bitte zuerst eine ROM laden.');return}
  if(!canvas.captureStream||!window.MediaRecorder){alert('Videoaufnahme wird von diesem Browser nicht unterstützt.');return}
