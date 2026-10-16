@@ -1,6 +1,6 @@
 import './style.css';
-import { load as loadSnes9x } from '@wasm-gaming/snes9x-wasm';
-const $=s=>document.querySelector(s);let frame=0,rom='',length=600,playing=false,engine=null,loadingRom=false,checkpoint=null;const movie=new Map(),keys=['Up','Down','Left','Right','B','A','Y','X','L','R','Select','Start'];
+import { load as loadSnes9x } from './vendor/snes9x/snes9x.sdk.ts';
+const $=s=>document.querySelector(s);let frame=0,rom='',length=600,playing=false,engine=null,loadingRom=false,checkpoint=null,playTimer=null;const frameStates=new Map();const movie=new Map(),keys=['Up','Down','Left','Right','B','A','Y','X','L','R','Select','Start'];
 $('#app').innerHTML=`<header><div class="brand"><b>S</b><div><strong>SNES TAS BROWSER</strong><small>FRAME-PERFECT WORKBENCH · PROTOTYPE</small></div></div><button id="export" class="primary">Export Movie JSON</button></header><main><section class="hero"><div><small>SUPER NINTENDO · TOOL-ASSISTED SPEEDRUNNING</small><h1>Every frame.<br><em>Under your control.</em></h1><p>Load your own ROM, map inputs frame by frame, and save your movie project.</p></div><label class="btn">＋ Load ROM<input id="rom" type="file" accept=".sfc,.smc,.fig,.swc"></label></section><div class="notice"><b>SNES9x core loaded. Timeline editing and save states are available; deterministic one-frame execution and RAM reads require a deeper core adapter.</div><section class="grid"><article class="panel"><h3>01 / GAME VIEW <span id="status">NO ROM LOADED</span></h3><div id="screen"><b>SNES<span>TAS</span></b><p>Select a ROM to begin</p><small>YOUR ROM STAYS ON THIS DEVICE</small></div><nav><button id="minus10">↞ 10</button><button id="minus">◂ 1</button><button id="play" class="primary">▶ Play TAS</button><button id="plus">1 ▸</button><button id="plus10">10 ↠</button><button id="save-state">Save state</button><button id="load-state" disabled>Load state</button></nav><div class="readout">CURRENT FRAME <strong id="frame">000000</strong><label>Jump <input id="jump" type="number" min="0" value="0"></label></div></article><article class="panel"><h3>02 / INPUT EDITOR <span>MOVIE DATA</span></h3><div class="toolbar"><div><b>Input timeline</b><small>Pick a frame, then toggle buttons</small></div><button id="clear">Clear frame</button></div><div id="timeline"></div><div class="controller"><div class="dpad"><button data-key="Up">↑</button><div><button data-key="Left">←</button><button data-key="Down">↓</button><button data-key="Right">→</button></div></div><div class="face"><button data-key="X">X</button><button data-key="Y">Y</button><button data-key="A">A</button><button data-key="B">B</button></div><div class="shoulders"><button data-key="L">L</button><button data-key="R">R</button><button data-key="Select">SELECT</button><button data-key="Start">START</button></div></div></article></section><section class="grid lower"><article class="panel"><h3>03 / MEMORY WATCH <span>READ API NOT EXPOSED</span></h3><p class="muted">The emulator is running, but this core wrapper does not yet expose WRAM reads to the UI.</p>${['7E:0000','7E:0002','7E:0004'].map(a=>`<div class="mem"><code>${a}</code><b>—</b><small>WRAM · 24-bit bus address</small></div>`).join('')}</article><article class="panel"><h3>04 / PROJECT <span>LOCAL FILES</span></h3><div class="line"><span>ROM</span><b id="romname">Not loaded</b></div><div class="line"><span>Movie length</span><b id="len">600 frames</b></div><div class="line"><span>Format</span><b>SNES-TAS JSON v1</b></div><div class="actions"><label class="btn">Import movie<input id="import" type="file" accept=".json,application/json"></label></div></article></section><footer>SNES TAS BROWSER <span>Bring your own ROM · Local only · Starter build</span></footer></main>`;
 function setInput(k){let s=movie.get(frame)||new Set();s=new Set(s);s.has(k)?s.delete(k):s.add(k);if(s.size)movie.set(frame,s);else movie.delete(frame);draw()}
 function draw(){ 
@@ -26,7 +26,15 @@ function draw(){
  document.querySelectorAll('[data-key]').forEach(b=>b.classList.toggle('active',(movie.get(frame)||new Set()).has(b.dataset.key)));
 }
 let paintMode=null;window.addEventListener('pointerup',()=>paintMode=null);
-function step(n){frame=Math.max(0,frame+n);length=Math.max(length,frame+1);draw()}
+async function step(n){
+ if(!engine){frame=Math.max(0,frame+n);length=Math.max(length,frame+1);draw();return}
+ if(playing)stopTas();
+ if(n<0){const target=Math.max(0,frame+n);const saved=frameStates.get(target);if(saved){engine.pause();await engine.loadState(saved);frame=target;$('#status').textContent='RESTORED FRAME '+frame;draw()}else{alert('Kein gespeicherter Zustand für diesen Frame. Nutze Reset/Import oder gehe schrittweise zurück, nachdem Checkpoints erstellt wurden.')}return}
+ for(let i=0;i<n;i++){const buttons=[...(movie.get(frame)||new Set())];engine.setTasInput(buttons);engine.stepFrame();frame++;length=Math.max(length,frame+1);if(frame%30===0){try{frameStates.set(frame,await engine.saveState())}catch{}}}
+ $('#status').textContent='PAUSED · CORE FRAME '+frame;draw()
+}
+function stopTas(){if(playTimer!==null){clearInterval(playTimer);playTimer=null}playing=false;if(engine)engine.pause();$('#play').textContent='▶ Play TAS'}
+function playTas(){if(!engine){alert('Bitte zuerst eine gültige SNES-ROM laden.');return}if(playing){stopTas();$('#status').textContent='EMULATOR PAUSED';return}playing=true;$('#play').textContent='Ⅱ Pause';$('#status').textContent='TAS PLAYBACK';engine.pause();playTimer=setInterval(()=>{if(!engine||!playing){stopTas();return}if(frame>=length){stopTas();$('#status').textContent='MOVIE END';return}try{engine.setTasInput([...(movie.get(frame)||new Set())]);engine.stepFrame();frame++;draw()}catch(err){stopTas();$('#status').textContent='TAS ERROR';console.error(err)}},16);}
 $('#save-state').onclick=async()=>{if(!engine){alert('Bitte zuerst eine ROM laden.');return}try{checkpoint=await engine.saveState();$('#load-state').disabled=false;$('#status').textContent='STATE SAVED · FRAME '+frame}catch(err){alert('Save State fehlgeschlagen: '+(err?.message||err))}};
 $('#load-state').onclick=async()=>{if(!engine||!checkpoint)return;try{engine.pause();playing=false;await engine.loadState(checkpoint);$('#play').textContent='▶ Play TAS';$('#status').textContent='STATE RESTORED · FRAME '+frame}catch(err){alert('Load State fehlgeschlagen: '+(err?.message||err))}};
 $('#minus10').onclick=()=>step(-10);$('#minus').onclick=()=>step(-1);$('#plus').onclick=()=>step(1);$('#plus10').onclick=()=>step(10);$('#jump').onchange=e=>{frame=Math.max(0,+e.target.value||0);step(0)};$('#clear').onclick=()=>{movie.delete(frame);draw()};document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>setInput(b.dataset.key));$('#play').onclick=()=>{
@@ -37,7 +45,7 @@ $('#minus10').onclick=()=>step(-10);$('#minus').onclick=()=>step(-1);$('#plus').
 $('#rom').onchange=async e=>{
  const f=e.target.files[0];if(!f||loadingRom)return;
  loadingRom=true;rom=f.name;
- if(engine){engine.destroy();engine=null}checkpoint=null;$('#load-state').disabled=true;
+ if(engine){engine.destroy();engine=null}if(playTimer!==null){clearInterval(playTimer);playTimer=null}playing=false;frameStates.clear();checkpoint=null;$('#load-state').disabled=true;
  playing=false;$('#play').textContent='▶ Play';$('#status').textContent='LOADING SNES CORE…';$('#romname').textContent=rom;
  $('#screen').innerHTML='<div class="emulator-loading">Loading WebAssembly SNES core…<br><small>ROM remains on this device.</small></div>';
  try{
@@ -45,7 +53,7 @@ $('#rom').onchange=async e=>{
   const canvas=document.createElement('canvas');canvas.id='game-canvas';canvas.setAttribute('aria-label','SNES game display');
   $('#screen').replaceChildren(canvas);
   engine=await loadSnes9x({canvasEl:canvas,assets:{rom:bytes},jsUrl:new URL('core/snes9x.js',window.location.href).href,wasmUrl:new URL('core/snes9x.wasm',window.location.href).href,options:{region:'auto',aspect:'4:3',renderFilter:'pixelated',gamepads:true,escMenu:false},persist:'opfs',storageNamespace:'snes-tas-browser'});
-  engine.start();playing=true;$('#play').textContent='Ⅱ Pause';$('#status').textContent='SNES9X RUNNING';
+  engine.start();engine.pause();playing=false;frame=0;frameStates.clear();$('#play').textContent='▶ Play TAS';$('#status').textContent='SNES9X READY · PAUSED';
   $('#screen').classList.add('emulator-active');
   $('#screen').insertAdjacentHTML('beforeend',`<div class="rom-meta">${rom.replace(/[&<>"]/g,'')} · ${(bytes.byteLength/1048576).toFixed(2)} MB</div>`);
  }catch(err){
