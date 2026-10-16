@@ -42,7 +42,7 @@ $('#rom').onchange=async e=>{
   const bytes=new Uint8Array(await f.arrayBuffer());
   const canvas=document.createElement('canvas');canvas.id='game-canvas';canvas.setAttribute('aria-label','SNES game display');
   $('#screen').replaceChildren(canvas);
-  engine=await loadSnes9x({canvasEl:canvas,assets:{rom:bytes},options:{region:'auto',aspect:'4:3',renderFilter:'pixelated',gamepads:true,escMenu:false},persist:'opfs',storageNamespace:'snes-tas-browser'});
+  engine=await loadSnes9x({canvasEl:canvas,assets:{rom:bytes},jsUrl:new URL('core/snes9x.js',window.location.href).href,wasmUrl:new URL('core/snes9x.wasm',window.location.href).href,options:{region:'auto',aspect:'4:3',renderFilter:'pixelated',gamepads:true,escMenu:false},persist:'opfs',storageNamespace:'snes-tas-browser'});
   engine.start();playing=true;$('#play').textContent='Ⅱ Pause';$('#status').textContent='SNES9X RUNNING';
   $('#screen').classList.add('emulator-active');
   $('#screen').insertAdjacentHTML('beforeend',`<div class="rom-meta">${rom.replace(/[&<>"]/g,'')} · ${(bytes.byteLength/1048576).toFixed(2)} MB</div>`);
