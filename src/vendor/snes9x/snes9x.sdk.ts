@@ -800,7 +800,8 @@ export async function load(config: EngineConfig): Promise<Snes9xInstance> {
     readWram(offset: number) {
       const read = mod._s9xwasm_read_wram;
       if (typeof read !== 'function' || !Number.isInteger(offset) || offset < 0 || offset > 0x1ffff) return null;
-      return read(offset) & 0xff;
+      const value = read(offset);
+      return value < 0 ? null : value & 0xff;
     },
     setTasInput(buttons: string[]) {
       const bitNames: Record<string, number> = { B: 0, Y: 1, Select: 2, Start: 3, Up: 4, Down: 5, Left: 6, Right: 7, A: 8, X: 9, L: 10, R: 11 };
